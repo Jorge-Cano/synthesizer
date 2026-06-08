@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Modular Euro-Synth & Step Sequencer</title>
+  <title>Modular Euro-Synth & Step Sequencer (Custom Scale Update)</title>
   <!-- Load Tone.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <style>
@@ -167,7 +167,8 @@
     .mod-vco { border-top: 4px solid var(--accent-cyan); width: 180px; }
     .mod-vca { border-top: 4px solid var(--accent-magenta); width: 180px; }
     .mod-lfo { border-top: 4px solid var(--accent-yellow); width: 180px; }
-    .mod-drums { border-top: 4px solid var(--accent-green); width: 220px; }
+    .mod-scale { border-top: 4px solid #ffffff; width: 200px; }
+    .mod-drums { border-top: 4px solid var(--accent-green); width: 200px; }
 
     /* Eurorack Styled Knobs */
     .knob-container {
@@ -185,33 +186,27 @@
       text-transform: uppercase;
     }
 
-    .knob-wrapper {
-      position: relative;
-      width: 45px;
-      height: 45px;
-    }
-
-    /* Using standard range sliders styled vertically/safely for simple use */
-    .knob-wrapper input[type="range"] {
-      width: 45px;
-      margin: 0;
-    }
-
     .value-display {
       font-size: 10px;
       color: #888;
       margin-top: 2px;
     }
 
-    select {
+    select, input[type="text"] {
       background: #111;
       color: #fff;
       border: 1px solid #555;
-      padding: 4px;
+      padding: 6px;
       font-size: 11px;
       outline: none;
-      width: 80%;
-      margin-bottom: 10px;
+      width: 90%;
+      margin-bottom: 12px;
+      font-family: inherit;
+    }
+
+    input[type="text"] {
+      text-transform: uppercase;
+      letter-spacing: 1px;
     }
 
     /* Sequencer Grid Module Layout */
@@ -258,13 +253,6 @@
       padding: 0;
     }
 
-    /* Group steps into 4x4 blocks via shading */
-    .step-btn:nth-child(4n+1), 
-    .step-btn:nth-child(4n+2), 
-    .step-btn:nth-child(4n+3), 
-    .step-btn:nth-child(4n+4) {
-      /* Dynamic visual groupings */
-    }
     .grid-container .step-btn:nth-child(n+5):nth-child(-n+8),
     .grid-container .step-btn:nth-child(n+13):nth-child(-n+16) {
       background: #282828;
@@ -393,18 +381,41 @@
       </div>
     </div>
 
+    <!-- QUANTIZER / SCALE MODULE -->
+    <div class="module mod-scale">
+      <div class="module-title">QUANTIZER / SCALE</div>
+      
+      <label style="font-size:10px; color:#aaa;" for="scale-preset">MODE PRESETS</label>
+      <select id="scale-preset">
+        <option value="default">Default (Cmaj7-Am7-Fmaj7-G7)</option>
+        <option value="aeolian">A Minor / Aeolian</option>
+        <option value="dorian">D Dorian Mode</option>
+        <option value="custom">-- CUSTOM STRINGS --</option>
+      </select>
+
+      <label style="font-size:10px; color:#aaa; margin-top:5px; align-self:flex-start; margin-left:10px;">CHORD 1:</label>
+      <input type="text" id="chord-0" value="C3 E3 G3 B3">
+
+      <label style="font-size:10px; color:#aaa; align-self:flex-start; margin-left:10px;">CHORD 2:</label>
+      <input type="text" id="chord-1" value="A2 C3 E3 G3">
+
+      <label style="font-size:10px; color:#aaa; align-self:flex-start; margin-left:10px;">CHORD 3:</label>
+      <input type="text" id="chord-2" value="F2 A2 C3 E3">
+
+      <label style="font-size:10px; color:#aaa; align-self:flex-start; margin-left:10px;">CHORD 4:</label>
+      <input type="text" id="chord-3" value="G2 B2 D3 F3">
+    </div>
+
     <!-- DRUM CONTROLS MODULE -->
     <div class="module mod-drums">
       <div class="module-title">Drum Synthesis</div>
-      <!-- Kick Pitch Decay Control -->
       <div class="knob-container">
-        <label for="kick-decay">Kick Snap (Decay)</label>
+        <label for="kick-decay">Kick Snap</label>
         <input type="range" id="kick-decay" min="0.1" max="0.6" step="0.05" value="0.3">
         <span id="kick-val" class="value-display">0.3s</span>
       </div>
-      <!-- Pink Noise Hi-Hat Decay Control -->
       <div class="knob-container">
-        <label for="hat-decay">Hat Decay (Pink Noise)</label>
+        <label for="hat-decay">Hat Decay</label>
         <input type="range" id="hat-decay" min="0.01" max="0.2" step="0.01" value="0.05">
         <span id="hat-val" class="value-display">0.05s</span>
       </div>
@@ -434,7 +445,7 @@
       <div class="grid-container" id="grid-melody"></div>
     </div>
 
-    <!-- Live Status Loop Data Visualizer (Shift Register Tracker) -->
+    <!-- Live Status Loop Data Visualizer -->
     <div class="turing-status" id="turing-log">
       SHIFT REGISTER STATE: [Initialized. Waiting for engine start...]
     </div>
@@ -444,8 +455,6 @@
     /* ==========================================
        1. SYNTH ENGINE AUDIO ARCHITECTURE (Tone.js)
        ========================================== */
-    
-    // Master Safety Compressor Node
     const masterCompressor = new Tone.Compressor({
       threshold: -18,
       ratio: 4,
@@ -453,10 +462,9 @@
       release: 0.05
     }).toDestination();
 
-    // Volume Node
     const masterVolumeNode = new Tone.Volume(-6).connect(masterCompressor);
 
-    // --- TRACK 1: CHORD SYNTH (Polyphonic Subtractive Synth Routing) ---
+    // --- TRACK 1: CHORD SYNTH ---
     const vcf = new Tone.Filter(1000, "lowpass").connect(masterVolumeNode);
     
     const chordSynth = new Tone.PolySynth(Tone.Synth, {
@@ -464,26 +472,20 @@
       envelope: { attack: 0.05, decay: 0.2, sustain: 0.4, release: 0.5 }
     }).connect(vcf);
 
-    // Filter Modulation LFO Routing
     const lfo = new Tone.LFO({ frequency: "2hz", min: 400, max: 1400 }).start();
     lfo.connect(vcf.frequency);
 
-    // --- TRACK 2: KICK DRUM ENGINE (Custom VCO Pitch-Sweep Subtractive Model) ---
-    // Instead of simple samples, we craft a punchy frequency sweep
+    // --- TRACK 2: KICK DRUM ENGINE ---
     const kickSynth = new Tone.MembraneSynth({
       envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.3 },
       oscillator: { type: "sine" }
     }).connect(masterVolumeNode);
 
-    // --- TRACK 3: HI-HAT ENGINE (Pink Noise + Enveloped Modulator) ---
+    // --- TRACK 3: HI-HAT ENGINE ---
     const hatEnvelope = new Tone.AmplitudeEnvelope({
-      attack: 0.001,
-      decay: 0.05,
-      sustain: 0,
-      release: 0.05
+      attack: 0.001, decay: 0.05, sustain: 0, release: 0.05
     }).connect(masterVolumeNode);
     
-    // Lowpass filter to tame the pink noise for bright crisp hat sounds
     const hatFilter = new Tone.Filter(8000, "highpass").connect(hatEnvelope);
     const pinkNoiseNode = new Tone.Noise("pink").start().connect(hatFilter);
 
@@ -494,36 +496,82 @@
     class PseudoShiftRegister {
       constructor(length = 8) {
         this.length = length;
-        // Seed initial floating arrays representing slightly chaotic control variations
         this.register = Array.from({length: this.length}, () => Math.random());
-        this.mutationProbability = 0.25; // 25% chance to drift patterns seamlessly
+        this.mutationProbability = 0.25;
       }
-
       step() {
         this.register.pop();
-        // Shift bits: with a specific chance, generate chaos, else loop existing elements
         const driftVal = Math.random() < this.mutationProbability ? Math.random() : this.register[0];
         this.register.unshift(driftVal);
         return driftVal;
       }
-
       getCurrentStateString() {
         return this.register.map(v => v.toFixed(2)).join(" | ");
       }
     }
     const turingRegister = new PseudoShiftRegister(8);
 
-    // Define harmonic scales for the chord progression triggers
-    const scaleChords = [
-      ["C3", "E3", "G3", "B3"],   // Cmaj7
-      ["A2", "C3", "E3", "G3"],   // Am7
-      ["F2", "A2", "C3", "E3"],   // Fmaj7
-      ["G2", "B2", "D3", "F3"]    // G7
+
+    /* ==========================================
+       3. HARMONIC DYNAMIC CHORD STATE PRESETS
+       ========================================== */
+    let runningScaleChords = [
+      ["C3", "E3", "G3", "B3"],
+      ["A2", "C3", "E3", "G3"],
+      ["F2", "A2", "C3", "E3"],
+      ["G2", "B2", "D3", "F3"]
     ];
+
+    const presets = {
+      default: [
+        ["C3", "E3", "G3", "B3"],
+        ["A2", "C3", "E3", "G3"],
+        ["F2", "A2", "C3", "E3"],
+        ["G2", "B2", "D3", "F3"]
+      ],
+      aeolian: [
+        ["A2", "C3", "E3", "G3"], // Am7
+        ["F2", "A2", "C3", "E3"], // Fmaj7
+        ["C3", "E3", "G3", "B3"], // Cmaj7
+        ["E2", "G2", "B2", "D3"]  // Em7
+      ],
+      dorian: [
+        ["D3", "F3", "A3", "C4"], // Dm7
+        ["G2", "B2", "D3", "F3"], // G7
+        ["C3", "E3", "G3", "B3"], // Cmaj7
+        ["A2", "C3", "E3", "G3"]  // Am7
+      ]
+    };
+
+    function updateChordsFromInputs() {
+      for (let i = 0; i < 4; i++) {
+        const inputVal = document.getElementById(`chord-${i}`).value.trim();
+        if (inputVal) {
+          runningScaleChords[i] = inputVal.split(/\s+/);
+        }
+      }
+    }
+
+    for (let i = 0; i < 4; i++) {
+      document.getElementById(`chord-${i}`).addEventListener('input', () => {
+        document.getElementById('scale-preset').value = 'custom';
+        updateChordsFromInputs();
+      });
+    }
+
+    document.getElementById('scale-preset').addEventListener('change', (e) => {
+      const selection = e.target.value;
+      if (selection !== 'custom') {
+        runningScaleChords = JSON.parse(JSON.stringify(presets[selection]));
+        for (let i = 0; i < 4; i++) {
+          document.getElementById(`chord-${i}`).value = runningScaleChords[i].join(" ");
+        }
+      }
+    });
 
 
     /* ==========================================
-       3. STEP-SEQUENCER GRID LOGIC & DOM COUPLING
+       4. STEP-SEQUENCER GRID LOGIC & DOM COUPLING
        ========================================== */
     const TOTAL_STEPS = 16;
     const tracks = {
@@ -532,12 +580,10 @@
       melody: Array(TOTAL_STEPS).fill(false)
     };
 
-    // Pre-populate classical house/techno elements to have immediate sound upon initialization
     tracks.kick[0] = tracks.kick[4] = tracks.kick[8] = tracks.kick[12] = true; 
     tracks.hat[2] = tracks.hat[6] = tracks.hat[10] = tracks.hat[14] = true;
-    tracks.melody[0] = tracks.melody[8] = true;
+    tracks.melody[0] = tracks.melody[4] = tracks.melody[8] = tracks.melody[12] = true;
 
-    // Generate grid markup dynamically
     function buildSequencerUI() {
       const rowIds = ['kick', 'hat', 'melody'];
       rowIds.forEach(trackId => {
@@ -560,63 +606,55 @@
 
 
     /* ==========================================
-       4. HIGH-PRECISION AUDIO TRANSPORT LOOP
+       5. HIGH-PRECISION AUDIO TRANSPORT LOOP
        ========================================== */
     let currentStepIndex = 0;
 
     Tone.Transport.scheduleRepeat((time) => {
-      // Visual tracking markers: Cycle across UI steps
       const rowIds = ['kick', 'hat', 'melody'];
       rowIds.forEach(trackId => {
         const container = document.getElementById(`grid-${trackId}`);
         const buttons = container.children;
-        // Strip out active markers from previous cycles
         for (let i = 0; i < buttons.length; i++) {
           buttons[i].classList.remove('playing');
         }
-        // Apply active outline marker to current processing step
         if (buttons[currentStepIndex]) {
           buttons[currentStepIndex].classList.add('playing');
         }
       });
 
-      // --- TRG 1: KICK DRUM ENGINE ---
+      // --- TRG 1: KICK DRUM ---
       if (tracks.kick[currentStepIndex]) {
         kickSynth.triggerAttackRelease("C1", "8n", time);
       }
 
-      // --- TRG 2: ENVELOPED PINK NOISE HI-HAT ---
+      // --- TRG 2: HI-HAT ---
       if (tracks.hat[currentStepIndex]) {
-        // Grab values from shift register to introduce organic micro-tonal variations to decay!
         const randomFactor = turingRegister.step();
         const baseDecay = parseFloat(document.getElementById('hat-decay').value);
-        // Randomly modulate the decay envelope by up to 30ms for dynamic velocity/groove humanization
         hatEnvelope.decay = baseDecay + (randomFactor * 0.03);
-        
         hatEnvelope.triggerAttackRelease("16n", time);
         
-        // Push status to UI output container
         document.getElementById('turing-log').innerText = `SHIFT REGISTER BITSTREAM: [${turingRegister.getCurrentStateString()}] (Drift Modulating Hat Decay)`;
       }
 
-      // --- TRG 3: MELODIC CHORD RANDOM SELECTION ---
+      // --- TRG 3: MELODIC CHORD TRG ---
       if (tracks.melody[currentStepIndex]) {
-        // Select chord variations systematically based on current timeline index step allocations
-        const chordIndex = Math.floor(currentStepIndex / 4) % scaleChords.length;
-        const targetChord = scaleChords[chordIndex];
-        chordSynth.triggerAttackRelease(targetChord, "2n", time);
+        const chordIndex = Math.floor(currentStepIndex / 4) % 4;
+        const targetChord = runningScaleChords[chordIndex];
+        
+        if (targetChord && targetChord.length > 0) {
+          chordSynth.triggerAttackRelease(targetChord, "2n", time);
+        }
       }
 
-      // Progress global circular structural buffer index
       currentStepIndex = (currentStepIndex + 1) % TOTAL_STEPS;
     }, "16n");
 
 
     /* ==========================================
-       5. INTERFACE PARAMETER KNOBS & SLIDERS COUPLING
+       6. INTERFACE PARAMETER KNOBS & SLIDERS COUPLING
        ========================================== */
-    
-    // Master Power Toggle Action Handler
     const powerBtn = document.getElementById('power-btn');
     powerBtn.addEventListener('click', async () => {
       if (Tone.Transport.state === 'started') {
@@ -631,61 +669,52 @@
       }
     });
 
-    // Control: Master BPM Slider
     document.getElementById('bpm-slider').addEventListener('input', (e) => {
       const bpm = e.target.value;
       Tone.Transport.bpm.value = bpm;
       document.getElementById('bpm-val').textContent = bpm;
     });
 
-    // Control: Master Volume Level Slider
     document.getElementById('master-volume').addEventListener('input', (e) => {
       const gain = e.target.value;
       masterVolumeNode.volume.value = gain;
       document.getElementById('vol-val').textContent = `${gain}dB`;
     });
 
-    // Control: VCO Select Waveforms
     document.getElementById('wave-type').addEventListener('change', (e) => {
       chordSynth.set({ oscillator: { type: e.target.value } });
     });
 
-    // Control: VCO Fine-Detuning Parameters
     document.getElementById('vco-detune').addEventListener('input', (e) => {
       const detune = e.target.value;
       chordSynth.set({ oscillator: { detune: detune } });
       document.getElementById('detune-val').textContent = `${detune} cent`;
     });
 
-    // Control: VCA Dynamic Attack Envelope Settings
     document.getElementById('env-attack').addEventListener('input', (e) => {
       const val = parseFloat(e.target.value);
       chordSynth.set({ envelope: { attack: val } });
       document.getElementById('attack-val').textContent = `${val}s`;
     });
 
-    // Control: VCA Dynamic Decay Envelope Settings
     document.getElementById('env-decay').addEventListener('input', (e) => {
       const val = parseFloat(e.target.value);
       chordSynth.set({ envelope: { decay: val } });
       document.getElementById('decay-val').textContent = `${val}s`;
     });
 
-    // Control: VCA Sustain Amplitude Levels
     document.getElementById('env-sustain').addEventListener('input', (e) => {
       const val = parseFloat(e.target.value);
       chordSynth.set({ envelope: { sustain: val } });
       document.getElementById('sustain-val').textContent = val;
     });
 
-    // Control: LFO Cutoff Rates Modification
     document.getElementById('lfo-rate').addEventListener('input', (e) => {
       const val = parseFloat(e.target.value);
       lfo.frequency.value = val;
       document.getElementById('lfo-rate-val').textContent = `${val} Hz`;
     });
 
-    // Control: LFO Cutoff Amplitude Depth Modulation
     document.getElementById('lfo-depth').addEventListener('input', (e) => {
       const val = parseInt(e.target.value);
       lfo.min = Math.max(100, 900 - val);
@@ -693,7 +722,6 @@
       document.getElementById('lfo-depth-val').textContent = `${val} Hz`;
     });
 
-    // Control: Kick Decay Frequency Transient Shifter
     document.getElementById('kick-decay').addEventListener('input', (e) => {
       const val = parseFloat(e.target.value);
       kickSynth.envelope.decay = val;
@@ -701,7 +729,6 @@
       document.getElementById('kick-val').textContent = `${val}s`;
     });
 
-    // Control: Hi-Hat Pink Noise Decay Window Multipliers
     document.getElementById('hat-decay').addEventListener('input', (e) => {
       const val = parseFloat(e.target.value);
       document.getElementById('hat-val').textContent = `${val}s`;
